@@ -47,10 +47,7 @@ void readQueriesToTerms(unordered_set<string> &queryTerms, const char *queryFile
         ss.str(line);
         while(!ss.eof()){
             ss>>term;
-            string stem = repo.processTerm(term);
-            if(stem.length() < 0)
-                continue;
-            queryTerms.insert(stem);
+            queryTerms.insert(term);
         }
     }
 }
@@ -65,7 +62,8 @@ void mapQueryTermsToId(unordered_set<string> &queryTerms,
 	int termID;
 	unordered_set<string>::iterator it;
     for (it = queryTerms.begin(); it != queryTerms.end(); it++){
-        string stem = *it;
+		string term = *it;
+        string stem = repo.processTerm(term);
         termID = index->term(stem);
         if(termID <= 0)
             continue;
@@ -140,7 +138,7 @@ void get_document_vector(indri::index::Index *index,
     for(it = docVec.begin(); it != docVec.end(); it++){
         termID = it->first;
         freq = it->second;
-        stem = id2stem[termID];
+        string stem = (id2stem.find(termID))->second;
         if(features.find(stem) == features.end())
             features[stem] = FeatVec(1, freq/double(docLen), freq);
         else
@@ -184,7 +182,8 @@ int main(int argc, char **argv){
     string repoPaths[nRepos];       // each repo path
     int i = 0;
     for(i = 0; i < nRepos; i++){
-        repoPaths[i] = argv[i + 1];
+        repoPaths[i] = argv[i + 2];
+        cout<<repoPaths[i]<<endl;
     }
     string extidFile = argv[nRepos + 2];    // doc extid in one shard, each line is an extid
     string outFile = argv[nRepos + 3];      // output file
@@ -198,7 +197,7 @@ int main(int argc, char **argv){
     indri::collection::Repository repos[nRepos];
     QueryEnvironment IndexEnvs[nRepos];
     for(i = 0; i < nRepos; i++) {
-        IndexEnvs[i].addIndex (repoPath);
+        IndexEnvs[i].addIndex (repoPaths[i]);
         indri::index::Index *index = NULL;
         indri::collection::Repository::index_state state;
         repos[i].openRead(repoPaths[i]);
@@ -240,10 +239,12 @@ int main(int argc, char **argv){
 
         for(i = 0; i < nRepos; i++){
             intids = IndexEnvs[i].documentIDsFromMetadata("docno", extids);
+            if (intids.size() < 1) continue;
             intid = intids[0];
             if (intid > 0) break;
         }
         if (intid > 0){
+            cout<<extid<<" "<<repoPaths[i]<<endl;
             get_document_vector(indexes[i], intid, list_queryTermIDs[i], list_id2stems[i], features);
         }
 
