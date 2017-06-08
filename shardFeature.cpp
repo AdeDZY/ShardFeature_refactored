@@ -138,12 +138,13 @@ struct FeatVec{
 void get_document_vector(indri::index::Index *index,
                          const int docid,
                          const unordered_set<int> &queryTerms,
+                         const set<pair<int, int> > &queryBigrams,
                          const unordered_map<int, string> &id2stem,
                          unordered_map<string, FeatVec> featureList[],
                          map<pair<string, string>, FeatVec> &bigramFeatures) {
 
-    int nFields = 4;
-    string fields[4] = {"body", "title", "url", "inlink"};
+    int nFields = 3;
+    string fields[nFields] = {"body", "title", "inlink"};
 	int fieldIDs[nFields + 1];
     for (int i = 0; i < nFields; i++) {
         fieldIDs[i] = index->field(fields[i]);
@@ -157,7 +158,7 @@ void get_document_vector(indri::index::Index *index,
     indri::utility::greedy_vector <indri::index::FieldExtent> fieldVec = list->fields();
     indri::utility::greedy_vector<indri::index::FieldExtent>::iterator fIter = fieldVec.begin();
 
-    int docLens[4] = {0, 0, 0, 0};
+    int docLens[nFields] = {0, 0, 0, 0};
     int fdx;
     while(fIter != fieldVec.end())
     {
@@ -214,7 +215,7 @@ void get_document_vector(indri::index::Index *index,
                 featureList[fdx][stem].updateFeature(freq, docLens[fdx]);
         }
         // to get shard size and total term freq in shards
-        featureList[fdx][" "].updateFeature(docLens[fdx], docLens[fdx]);
+        featureList[fdx]["-1"].updateFeature(docLens[fdx], docLens[fdx]);
     }
 
     // bigram features
@@ -233,7 +234,7 @@ void get_document_vector(indri::index::Index *index,
             continue;
 
         std::pair<int, int> p = std::make_pair(terms[t], terms[t + 1]);
-        if (queryTerms.find(p) == queryTerms.end())  // not query term
+        if (queryBigrams.find(p) == queryBigrams.end())  // not query term
             continue;
 
         if (docVec.find(p) != docVec.end()) {
@@ -247,26 +248,26 @@ void get_document_vector(indri::index::Index *index,
 
     if(docLen > 0){
         // update feature
-        map<pair<string, string>, int>::iterator it;
+        map<pair<int, int>, int>::iterator it;
         int freq;
         pair<int, int> bigram;
         for(it = docVec.begin(); it != docVec.end(); it++){
             bigram = it->first;
             freq = it->second;
-            int termID_0 = bigram->first;
-            int termID_1 = bigram->second;
+            int termID_0 = bigram.first;
+            int termID_1 = bigram.second;
             string stem_0 = (id2stem.find(termID_0))->second;
             string stem_1 = (id2stem.find(termID_1))->second;
-            bigram_stem = std::make_pair(stem_0, stem_1);
-            if(features.find(bigram) == features.end())
-                bigramFeature[bigram_stem] = FeatVec(1, freq/double(docLen), freq);
+            pair<string, string> bigram_stem = std::make_pair(stem_0, stem_1);
+            if(bigramFeatures.find(bigram_stem) == bigramFeatures.end())
+                bigramFeatures[bigram_stem] = FeatVec(1, freq/double(docLen), freq);
             else
                 bigramFeatures[bigram_stem].updateFeature(freq, docLen);
         }
     }
 
     // to get shard size and total term freq in shards
-    bigramFeatures[std::make_pair(" ", " ")].updateFeature(docLen, docLen);
+    bigramFeatures[std::make_pair("-1", "-1")].updateFeature(docLen, docLen);
 
     // Finish processing this doc
 
@@ -280,7 +281,7 @@ void writeFeatures(const unordered_map<string, FeatVec> featureList[],
                    const string outFile){
     ofstream outStream;
     outStream.open(outFile.c_str());
-    int nFields = 4;
+    int nFields = 3;
     for(int fdx = 0; fdx < nFields; fdx++){
         unordered_map<string, FeatVec>::const_iterator it;
         vector<string> key_list;
@@ -349,22 +350,24 @@ int main(int argc, char **argv){
     unordered_set<string> queryTerms;
     vector<unordered_set<int> > list_queryTermIDs(nRepos);
     vector<unordered_map<int, string> > list_id2stems(nRepos);
+    vector<set<pair<int, int> > > list_queryBigrams(nRepos);
 
 
     readQueriesToTerms(queryTerms, queryFile.c_str());
     for(i = 0; i < nRepos; i++){
         unordered_set<int> queryTermIDs;
         mapQueryTermsToId(queryTerms, list_queryTermIDs[i], list_id2stems[i], indexes[i], repos[i]);
+		readQueryBigrams(list_queryBigrams[i], queryFile.c_str(), indexes[i], repos[i]);
     }
 
     // Features of different field
-    int nFields = 4;
+    int nFields = 3;
     unordered_map<string, FeatVec> featureList[nFields];
     for(int i = 0; i < nFields; i++){
-        featureList[i][" "] = FeatVec();
+        featureList[i]["-1"] = FeatVec();
     }
     map<pair<string, string>, FeatVec> bigramFeatures;
-    bigramFeatures[std::make_pair(" ", " ")] = FeatVec();
+    bigramFeatures[std::make_pair("-1", "-1")] = FeatVec();
 
     vector <string> extids;
     vector <int> intids;
@@ -387,8 +390,7 @@ int main(int argc, char **argv){
             if (intid > 0) break;
         }
         if (intid > 0){
-            cout<<extid<<" "<<repoPaths[i]<<endl;
-            get_document_vector(indexes[i], intid, list_queryTermIDs[i], list_id2stems[i], featureList, bigramFeatures);
+            get_document_vector(indexes[i], intid, list_queryTermIDs[i], list_queryBigrams[i], list_id2stems[i], featureList, bigramFeatures);
         }
 
     }
