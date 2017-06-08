@@ -97,7 +97,7 @@ void get_document_vector(indri::index::Index *index,
                          const int docid,
                          const unordered_set<int> &queryTerms,
                          const unordered_map<int, string> &id2stem,
-                         unordered_map<string, FeatVec> &featureList[]) {
+                         unordered_map<string, FeatVec> featureList[]) {
 
     unordered_map<int, int> docVec;
     unordered_map<int, int>::iterator docVecIt;
@@ -182,7 +182,7 @@ void get_document_vector(indri::index::Index *index,
 
 }
 
-void writeFeatures(const unordered_map<string, FeatVec> &featureList,
+void writeFeatures(const unordered_map<string, FeatVec> featureList[],
                    const string outFile){
     ofstream outStream;
     outStream.open(outFile.c_str());
