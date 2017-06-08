@@ -99,14 +99,15 @@ void get_document_vector(indri::index::Index *index,
                          const unordered_map<int, string> &id2stem,
                          unordered_map<string, FeatVec> featureList[]) {
 
-    unordered_map<int, int> docVec;
-    unordered_map<int, int>::iterator docVecIt;
-
     int nFields = 4;
     string fields[4] = {"body", "title", "url", "inlink"};
+	int fieldIDs[nFields + 1];
     for (int i = 0; i < nFields; i++) {
         fieldIDs[i] = index->field(fields[i]);
     }
+    
+	unordered_map<int, int> docVecs[nFields];
+    unordered_map<int, int>::iterator docVecIt;
 
     const indri::index::TermList *list = index->termList(docid);
     indri::utility::greedy_vector <int> &terms = (indri::utility::greedy_vector <int> &) list->terms();
@@ -190,12 +191,12 @@ void writeFeatures(const unordered_map<string, FeatVec> featureList[],
     for(int fdx = 0; fdx < nFields; fdx++){
         unordered_map<string, FeatVec>::const_iterator it;
         vector<string> key_list;
-        for (it=featureLists[fdx].begin(); it != featureLists[fdx].end(); ++it) {
+        for (it=featureList[fdx].begin(); it != featureList[fdx].end(); ++it) {
             key_list.push_back(it->first);
         }
         sort(key_list.begin(), key_list.end());
         for (vector<string>::iterator it2=key_list.begin(); it2 != key_list.end(); ++it2) {
-            it = featureLists[fdx].find(*it2);
+            it = featureList[fdx].find(*it2);
             outStream<<it->first;
             outStream<<" ";
             outStream<<it->second.df<<" "<<it->second.sum_tf<<" "<<it->second.sum_prob<<endl;
@@ -252,7 +253,7 @@ int main(int argc, char **argv){
     int nFields = 4;
     unordered_map<string, FeatVec> featureList[nFields];
     for(int i = 0; i < nFields; i++){
-        featureLists[i][" "] = FeatVec();
+        featureList[i][" "] = FeatVec();
     }
 
 
