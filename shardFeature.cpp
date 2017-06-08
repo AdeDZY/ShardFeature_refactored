@@ -97,56 +97,82 @@ void get_document_vector(indri::index::Index *index,
                          const int docid,
                          const unordered_set<int> &queryTerms,
                          const unordered_map<int, string> &id2stem,
-                         unordered_map<string, FeatVec> &features) {
+                         unordered_map<string, FeatVec> &featureList[]) {
 
     unordered_map<int, int> docVec;
     unordered_map<int, int>::iterator docVecIt;
 
+    int nFields = 4;
+    string fields[4] = {"body", "title", "url", "inlink"};
+    for (int i = 0; i < nFields; i++) {
+        fieldIDs[i] = index->field(fields[i]);
+    }
+
     const indri::index::TermList *list = index->termList(docid);
     indri::utility::greedy_vector <int> &terms = (indri::utility::greedy_vector <int> &) list->terms();
+    indri::utility::greedy_vector <indri::index::FieldExtent> fieldVec = list->fields();
+    indri::utility::greedy_vector<indri::index::FieldExtent>::iterator fIter = fieldVec.begin();
 
-    // the whole documents
-    int docLen = 0;
-    docVec.clear();
-    for (int t = 0; t < terms.size(); t++)
+    int docLens[4] = {0, 0, 0, 0};
+    int fdx;
+    while(fIter != fieldVec.end())
     {
-
-        if (terms[t] <= 0) // [OOV]
-            continue;
-
-        docLen++;
-
-        if (queryTerms.find(terms[t]) == queryTerms.end())  // not query term
-            continue;
-
-        if (docVec.find(terms[t]) != docVec.end()) {
-            docVec[terms[t]]++;
+        // find which field the current fIter is
+        for(fdx = 0; fdx < nFields; fdx++){
+            if ((*fIter).id == fieldIDs[fdx]){
+                break;
+            }
         }
-        else {
-            docVec[terms[t]] = 1;
+        if(fdx >= nFields){
+            fIter++;
+            continue;
         }
 
+        // processing the fdx field
+
+        int beginTerm = (*fIter).begin;
+        int endTerm = (*fIter).end;
+
+        // the text is inclusive of the beginning
+        // but exclusive of the ending
+        for(int t = beginTerm; t < endTerm; t++){
+            if (terms[t] <= 0) // [OOV]
+                continue;
+
+            docLens[fdx]++;
+
+            if (queryTerms.find(terms[t]) == queryTerms.end())  // not query term
+                continue;
+
+            if (docVecs[fdx].find(terms[t]) != docVecs[fdx].end()) {
+                docVecs[fdx][terms[t]]++;
+            }
+            else {
+                docVecs[fdx][terms[t]] = 1;
+            }
+        }
+        fIter++;
     }
 
-	if(docLen <= 0){
-		cout<<"docLen = 0: "<< docid<<endl;
-		return;
-	}
     // update feature
-    unordered_map<int, int>::iterator it;
-    int termID, freq;
-    for(it = docVec.begin(); it != docVec.end(); it++){
-        termID = it->first;
-        freq = it->second;
-        string stem = (id2stem.find(termID))->second;
-        if(features.find(stem) == features.end())
-            features[stem] = FeatVec(1, freq/double(docLen), freq);
-        else
-            features[stem].updateFeature(freq, docLen);
+    for(fdx = 0; fdx < nFields; fdx++){
+        if(docLens[fdx] <= 0)
+            continue;
+        unordered_map<int, int>::iterator it;
+        int termID, freq;
+        for(it = docVecs[fdx].begin(); it != docVecs[fdx].end(); it++){
+            termID = it->first;
+            freq = it->second;
+            string stem = (id2stem.find(termID))->second;
+            if(featureList[fdx].find(stem) == featureList[fdx].end())
+                featureList[fdx][stem] = FeatVec(1, freq/double(docLens[fdx]), freq);
+            else
+                featureList[fdx][stem].updateFeature(freq, docLens[fdx]);
+        }
+        // to get shard size and total term freq in shards
+        featureList[fdx][" "].updateFeature(docLens[fdx], docLens[fdx]);
     }
 
-	// to get shard size and total term freq in shards
-	features[" "].updateFeature(docLen, docLen);
 
     // Finish processing this doc
 
@@ -156,26 +182,30 @@ void get_document_vector(indri::index::Index *index,
 
 }
 
-void writeFeatures(const unordered_map<string, FeatVec> &features,
+void writeFeatures(const unordered_map<string, FeatVec> &featureList,
                    const string outFile){
-
     ofstream outStream;
     outStream.open(outFile.c_str());
-
-    unordered_map<string, FeatVec>::const_iterator it;
-    vector<string> key_list;
-    for (it=features.begin(); it != features.end(); ++it) {
-        key_list.push_back(it->first);
-    }
-	sort(key_list.begin(), key_list.end());
-    for (vector<string>::iterator it2=key_list.begin(); it2 != key_list.end(); ++it2) {
-        it = features.find(*it2);
-        outStream<<it->first;
-        outStream<<" ";
-        outStream<<it->second.df<<" "<<it->second.sum_tf<<" "<<it->second.sum_prob<<endl;
+    int nFields = 4;
+    for(int fdx = 0; fdx < nFields; fdx++){
+        unordered_map<string, FeatVec>::const_iterator it;
+        vector<string> key_list;
+        for (it=featureLists[fdx].begin(); it != featureLists[fdx].end(); ++it) {
+            key_list.push_back(it->first);
+        }
+        sort(key_list.begin(), key_list.end());
+        for (vector<string>::iterator it2=key_list.begin(); it2 != key_list.end(); ++it2) {
+            it = featureLists[fdx].find(*it2);
+            outStream<<it->first;
+            outStream<<" ";
+            outStream<<it->second.df<<" "<<it->second.sum_tf<<" "<<it->second.sum_prob<<endl;
+        }
+        outStream<<endl;
     }
     outStream.close();
 }
+
+
 
 int main(int argc, char **argv){
     int nRepos = atoi(argv[1]);     // number of indri repos
@@ -218,9 +248,12 @@ int main(int argc, char **argv){
         mapQueryTermsToId(queryTerms, list_queryTermIDs[i], list_id2stems[i], indexes[i], repos[i]);
     }
 
-    // Features
-    unordered_map<string, FeatVec> features;
-	features[" "] = FeatVec();
+    // Features of different field
+    int nFields = 4;
+    unordered_map<string, FeatVec> featureList[nFields];
+    for(int i = 0; i < nFields; i++){
+        featureLists[i][" "] = FeatVec();
+    }
 
 
     vector <string> extids;
@@ -245,7 +278,7 @@ int main(int argc, char **argv){
         }
         if (intid > 0){
             cout<<extid<<" "<<repoPaths[i]<<endl;
-            get_document_vector(indexes[i], intid, list_queryTermIDs[i], list_id2stems[i], features);
+            get_document_vector(indexes[i], intid, list_queryTermIDs[i], list_id2stems[i], featureList);
         }
 
     }
@@ -255,7 +288,7 @@ int main(int argc, char **argv){
         repos[i].close();
     }
 
-    writeFeatures(features, outFile);
+    writeFeatures(featureList, outFile);
 
     return 0;
 }
