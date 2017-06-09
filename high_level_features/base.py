@@ -37,7 +37,7 @@ class FieldStats:
         ndocs = 0
         for shard, shard_feat in self.map_shard_features.items():
             ndocs += shard_feat.shard_size
-            for term, term_feat in shard_feat.term2feat().items():
+            for term, term_feat in shard_feat.term2feat.items():
                 self.ref_dv[term] = self.ref_dv.get(term, 0.0) + term_feat.slm * shard_feat.shard_size
         for term in self.ref_dv:
             self.ref_dv[term] /= float(ndocs)
@@ -46,4 +46,4 @@ class FieldStats:
         self.dfs = {}
         for shard, shard_feat in self.map_shard_features.items():
             for term, term_feat in shard_feat.term2feat.items():
-                self.dfs[term] = self.get(term, 0) + term_feat.sdf
+                self.dfs[term] = self.dfs.get(term, 0) + term_feat.sdf
