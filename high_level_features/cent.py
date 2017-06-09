@@ -50,7 +50,7 @@ def stats(qterms, shard_features, dfs):
     return s1, s2, s3, s4
 
 
-def gen_lst(field_stats, query, dfs, method, miu):
+def gen_lst(field_stats, query, method, miu):
 
     qterms = query.split()
 
@@ -65,7 +65,7 @@ def gen_lst(field_stats, query, dfs, method, miu):
                 res[shard] = s
 
         if method == "stats":
-            ss = stats(qterms, shard_feat, dfs)
+            ss = stats(qterms, shard_feat, field_stats.dfs)
             res[shard] = " ".join([str(s) for s in ss])
 
     return res

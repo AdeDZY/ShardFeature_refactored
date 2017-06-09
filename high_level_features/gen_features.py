@@ -42,7 +42,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("partition_name")
     parser.add_argument("stemmed_query_file", type=argparse.FileType('r'), help="queryid:query_stem")
-    parser.add_argument("stem2df_file", type=argparse.FileType('r'), help="stem df")
     parser.add_argument("--miu", "-i", type=float, default=0.0001)
     parser.add_argument("--lamb", "-l", type=float, default=500)
     parser.add_argument("--n_fields", "-f", type=int, default=3, help="number of fields. default is 3 (body, title, inlink)")
@@ -71,13 +70,6 @@ def main():
     shards = []
     for line in open(shard_file):
         shards.append(line.strip())
-
-    # read df
-    dfs = {}
-    for line in args.stem2df_file:
-        stem, df = line.split(' ')
-        df = int(df)
-        dfs[stem]  = df
 
     # read in all feature files
 
@@ -111,8 +103,8 @@ def main():
         lst_res_lm = []
         lst_res_stats = []
         for i in range(args.n_fields):
-            res_lm = cent.gen_lst(lst_field_stats[i], query, dfs=dfs, method='lm', miu=args.miu)
-            res_stats = cent.gen_lst(lst_field_stats[i], query, dfs=dfs, method='stats', miu=args.miu)
+            res_lm = cent.gen_lst(lst_field_stats[i], query, method='lm', miu=args.miu)
+            res_stats = cent.gen_lst(lst_field_stats[i], query, method='stats', miu=args.miu)
             lst_res_lm.append(res_lm)
             lst_res_stats.append(res_stats)
         res_bigram = cent.gen_lst_bigram(bigram_stats, query)
