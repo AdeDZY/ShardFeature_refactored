@@ -28,8 +28,7 @@ using namespace indri::api;
 using std::tr1::unordered_set;
 using std::tr1::unordered_map;
 
-void readQueriesToStems(unordered_set<string> &queryTerms, const char *queryFile, indri::index::Index * index, indri::collection::Repository & repo){
-    queryTerms.clear();
+void readQueriesToStems(const char *queryFile, indri::index::Index * index, indri::collection::Repository & repo){
     ifstream queryStream;
     queryStream.open(queryFile);
 
@@ -54,7 +53,7 @@ void readQueriesToStems(unordered_set<string> &queryTerms, const char *queryFile
             string stem = repo.processTerm(term);
             cout<<stem<<" ";
         }
-        cout<<endl;
+	cout<<endl;
     }
 }
 
@@ -68,7 +67,6 @@ int main(int argc, char **argv){
     indri::collection::Repository repo;
     QueryEnvironment IndexEnv;
     IndexEnv.addIndex (repoPath);
-    indri::index::Index *index = NULL;
     indri::collection::Repository::index_state state;
     repo.openRead(repoPath);
     state = repo.indexes();
@@ -76,7 +74,7 @@ int main(int argc, char **argv){
 
     // read query terms
 
-    readQueriesToStems(queryTerms, queryFile.c_str(), index, repo);
+    readQueriesToStems(queryFile.c_str(), index, repo);
 
     return 0;
 }
