@@ -68,6 +68,17 @@ def gen_lst(field_stats, query, method, miu):
             ss = stats(qterms, shard_feat, field_stats.dfs)
             res[shard] = " ".join([str(s) for s in ss])
 
+    # get lm_inverse_rank, lm_binned_rank
+    if method == "lm":
+        tmp = [(score, shard) for shard, score in res.items()]
+        tmp = sorted(tmp, reverse=True)
+        for i in range(len(tmp)):
+            score, shard = tmp[i]
+            r = float(i + 1)
+            reversed_rank = 1 / r
+            binned_rank = int(r / 10)
+            res[shard] = ('{0} {1} {2}'.format(s, reversed_rank, binned_rank))
+
     return res
 
 
