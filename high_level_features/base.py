@@ -17,8 +17,10 @@ class FieldStats:
         self.map_shard_features = map_shard_features
         self.ref = {}
         self.ref_dv = {}
+        self.dfs = {}
         self.get_ref()
         self.get_ref_dv()
+        self.get_dfs()
 
     def get_ref(self):
         self.ref = {}  # tf / total_tf
@@ -39,3 +41,9 @@ class FieldStats:
                 self.ref_dv[term] = self.ref_dv.get(term, 0.0) + term_feat.slm * shard_feat.shard_size
         for term in self.ref_dv:
             self.ref_dv[term] /= float(ndocs)
+
+    def get_dfs(self):
+        self.dfs = {}
+        for shard, shard_feat in self.map_shard_features.items():
+            for term, term_feat in shard_feat.term2feat.items():
+                self.dfs[term] = self.get(term, 0) + term_feat.sdf
